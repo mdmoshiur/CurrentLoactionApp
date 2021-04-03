@@ -1,6 +1,8 @@
 package com.moshiur.googlemapmylocation;
 
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
 
 import android.Manifest;
@@ -27,6 +29,8 @@ public class MapsActivity extends FragmentActivity {
     private GoogleMap mMap;
     private SupportMapFragment mapFragment;
     private FusedLocationProviderClient client;
+    private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
+    private boolean locationPermissionGranted;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,38 +43,72 @@ public class MapsActivity extends FragmentActivity {
         client = LocationServices.getFusedLocationProviderClient(this);
 
         getCurrentLocation();
-
         //mapFragment.getMapAsync(this);
     }
 
-    private void getCurrentLocation() {
-        if (ActivityCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(MapsActivity.this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 44);
-
+    private void getLocationPermission() {
+        if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            locationPermissionGranted = true;
+        } else {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+                    PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
         }
-        Log.d("permission", "getCurrentLocation: "+ "outside if");
-        Task<Location> locationTask = client.getLastLocation();
-        locationTask.addOnSuccessListener(new OnSuccessListener<Location>() {
-            @Override
-            public void onSuccess(Location location) {
-                if (location != null){
-                    mapFragment.getMapAsync(new OnMapReadyCallback() {
-                        @Override
-                        public void onMapReady(GoogleMap googleMap) {
-                            //initialize lat long
-                            LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                            //Create marker options
-                            MarkerOptions markerOptions = new MarkerOptions().position(latLng).title("I am here now");
-                            //zoom map
-                            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15));
-                            //add marker
-                            googleMap.addMarker(markerOptions);
-                        }
-                    });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        locationPermissionGranted = false;
+        switch (requestCode) {
+            case PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    locationPermissionGranted = true;
+                    getCurrentLocation();
                 }
             }
-        });
+        }
+
     }
+
+    private void getCurrentLocation() {
+        getLocationPermission();
+        try {
+            if(locationPermissionGranted) {
+                Task<Location> locationTask = client.getLastLocation();
+                locationTask.addOnSuccessListener(new OnSuccessListener<Location>() {
+                    @Override
+                    public void onSuccess(Location location) {
+                        if (location != null){
+                            mapFragment.getMapAsync(new OnMapReadyCallback() {
+                                @Override
+                                public void onMapReady(GoogleMap googleMap) {
+                                    //initialize lat long
+                                    LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+                                    //Create marker options
+                                    MarkerOptions markerOptions = new MarkerOptions().position(latLng).title("I am here now");
+                                    //zoom map
+                                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15));
+                                    //add marker
+                                    googleMap.addMarker(markerOptions);
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+
+        } catch (SecurityException e)  {
+            Log.d("permission", e.getMessage(), e);
+        }
+
+    }
+
+
 
 }
